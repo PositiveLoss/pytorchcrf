@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytorchcrf"
+version = "0.1.0"
+description = "PyTorch CRF with N-best decoding"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["pytorch", "crf", "n-best"]
+authors = [
+    { name = "Yehor Smoliakov", email = "yehors@ukr.net" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "torch>=2.14.1",
+]
+
+[project.urls]
+Repository = "https://github.com/statech/pytorchCRF"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.1",
+]
+
