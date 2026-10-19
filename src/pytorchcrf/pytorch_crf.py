@@ -248,8 +248,8 @@ class CRF(torch.nn.Module):
 
         # Start transition score and first emission
         # shape: (batch_size,)
-        score = self.start_transitions[tags[0]]
-        score += emissions[0, batch_index, tags[0]]
+        # Out-of-place addition preserves promotion when emissions use a wider dtype.
+        score = self.start_transitions[tags[0]] + emissions[0, batch_index, tags[0]]
 
         for i in range(1, seq_length):
             # Transition score to next tag, only added if next timestep is valid (mask == 1)
@@ -425,8 +425,9 @@ class CRF(torch.nn.Module):
         device = emissions.device
         seq_length, batch_size = mask.shape
         # Only rank zero exists at the first timestep for each ending tag.
-        score = emissions.new_full((batch_size, self.num_tags, nbest), -torch.inf)
-        score[:, :, 0] = self.start_transitions + emissions[0]
+        initial_score = self.start_transitions + emissions[0]
+        score = initial_score.new_full((batch_size, self.num_tags, nbest), -torch.inf)
+        score[:, :, 0] = initial_score
         identity = (
             torch.arange(self.num_tags * nbest, device=device)
             .view(1, self.num_tags, nbest)

@@ -49,6 +49,9 @@ dimensions. Byte masks are also accepted. Each sequence must contain at least
 one token, and padding must occur only at the end. Tags must have dtype
 `torch.long`; unmasked tags must be in `[0, num_tags)`. Masked tags may contain
 padding values such as `-100`. Inputs and CRF parameters must be on the same device.
+Likelihood scores and decoding preserve PyTorch dtype promotion when emission
+and parameter dtypes differ. Gradients stored in low-precision tensors remain
+subject to rounding in that dtype.
 
 For training, minimize the negative log likelihood, for example
 `loss = -model(emissions, tags, mask, reduction="token_mean")`. The `mean`
