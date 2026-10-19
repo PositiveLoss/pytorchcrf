@@ -63,3 +63,34 @@ Run the correctness and training checks with:
 ```bash
 python -m unittest discover -s tests -v
 ```
+
+## TorchScript
+
+Both likelihood computation (`forward`) and best-path/N-best decoding (`decode`)
+are available on a scripted module, including after saving and loading:
+
+```python
+import torch
+from pytorchcrf import CRF
+
+model = CRF(num_tags=5, batch_first=True).eval()
+scripted = torch.jit.script(model)
+torch.jit.save(scripted, "crf.pt")
+restored = torch.jit.load("crf.pt")
+
+emissions = torch.randn(2, 4, 5)
+tags = torch.randint(5, (2, 4))
+mask = torch.tensor([[True, True, False, False], [True, True, True, True]])
+log_likelihood = restored(emissions, tags, mask, reduction="token_mean")
+paths = restored.decode(emissions, mask, nbest=3, pad_tag=-1)
+```
+
+Scripted models accept different batch sizes, sequence lengths, and `nbest`
+values at runtime. `forward` retains autograd support; `decode` disables it.
+Use `torch.jit.script` to preserve input-dependent loops and validation.
+
+Scripting, save/load, output parity, and gradients are tested with Python 3.14
+and PyTorch 2.14.1 on CPU. PyTorch warns that TorchScript is unsupported on
+Python 3.14+ and may break; these passing checks do not remove that upstream
+compatibility limitation. TorchScript execution on CUDA/MPS and C++ consumers
+has not been validated.

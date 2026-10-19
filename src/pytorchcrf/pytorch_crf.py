@@ -93,7 +93,7 @@ class CRF(torch.nn.Module):
             mask = torch.ones(
                 emissions.shape[:2], dtype=torch.bool, device=emissions.device
             )
-        mask = mask.bool()
+        mask = mask.to(dtype=torch.bool)
         self._validate(emissions, tags=tags, mask=mask)
 
         if self.batch_first:
@@ -117,9 +117,9 @@ class CRF(torch.nn.Module):
             return llh.sum()
         if reduction == "mean":
             return llh.mean()
-        return llh.sum() / mask.float().sum()
+        return llh.sum() / mask.to(dtype=torch.float32).sum()
 
-    @torch.no_grad()
+    @torch.jit.export
     def decode(
         self,
         emissions: torch.Tensor,
@@ -144,6 +144,16 @@ class CRF(torch.nn.Module):
             score order (ties have no guaranteed order), of shape
             (nbest, batch_size, seq_length)
         """
+        with torch.no_grad():
+            return self._decode(emissions, mask, nbest, pad_tag)
+
+    def _decode(
+        self,
+        emissions: torch.Tensor,
+        mask: torch.Tensor | None,
+        nbest: int | None,
+        pad_tag: int | None,
+    ) -> torch.Tensor:
         if nbest is None:
             nbest = 1
         if isinstance(nbest, bool) or not isinstance(nbest, int) or nbest < 1:
@@ -152,7 +162,7 @@ class CRF(torch.nn.Module):
             mask = torch.ones(
                 emissions.shape[:2], dtype=torch.bool, device=emissions.device
             )
-        mask = mask.bool()
+        mask = mask.to(dtype=torch.bool)
         self._validate(emissions, mask=mask)
 
         if self.batch_first:
@@ -203,7 +213,7 @@ class CRF(torch.nn.Module):
         if tags is not None and emissions.shape[:2] != tags.shape:
             raise ValueError(
                 "the first two dimensions of emissions and tags must match, "
-                f"got {tuple(emissions.shape[:2])} and {tuple(tags.shape)}"
+                f"got {emissions.shape[:2]} and {tags.shape}"
             )
 
         if tags is not None:
@@ -218,7 +228,7 @@ class CRF(torch.nn.Module):
             if emissions.shape[:2] != mask.shape:
                 raise ValueError(
                     "the first two dimensions of emissions and mask must match, "
-                    f"got {tuple(emissions.shape[:2])} and {tuple(mask.shape)}"
+                    f"got {emissions.shape[:2]} and {mask.shape}"
                 )
             no_empty_seq = not self.batch_first and mask[0].all()
             no_empty_seq_bf = self.batch_first and mask[:, 0].all()
@@ -262,7 +272,7 @@ class CRF(torch.nn.Module):
 
         # End transition score
         # shape: (batch_size,)
-        seq_ends = mask.long().sum(dim=0) - 1
+        seq_ends = mask.to(dtype=torch.long).sum(dim=0) - 1
         # shape: (batch_size,)
         last_tags = tags[seq_ends, batch_index]
         # shape: (batch_size,)
@@ -387,7 +397,7 @@ class CRF(torch.nn.Module):
         _, end_tag = end_score.max(dim=1)
 
         # shape: (batch_size,)
-        seq_ends = mask.long().sum(dim=0) - 1
+        seq_ends = mask.to(dtype=torch.long).sum(dim=0) - 1
 
         # insert the best tag at each sequence end (last position with mask == 1)
         history_idx = history_idx.transpose(1, 0).contiguous()
